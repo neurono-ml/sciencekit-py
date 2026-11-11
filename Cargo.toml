@@ -1,0 +1,27 @@
+[package]
+name = "sciencekit_python"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+rust-version = "1.85"
+description = "Python bindings for the sciencekit machine-learning library over the stable C ABI."
+repository = "https://github.com/neurono-ml/sciencekit-py"
+
+# Standalone Cargo project: not a member of the main sciencekit workspace.
+[workspace]
+
+[lib]
+name = "_native"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+sciencekit_ffi = { git = "https://github.com/neurono-ml/sciencekit", branch = "main" }
+pyo3 = "0.30"
+numpy = "0.30"
+
+[profile.dev.package."*"]
+opt-level = 2

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "sciencekit"
+version = "0.1.0"
+description = "Python bindings for the sciencekit machine-learning library over the stable sciencekit_ffi C ABI."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "sciencekit project" }]
+keywords = ["machine-learning", "rust", "pyo3", "numpy", "linear-regression", "standard-scaler"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.24",
+]
+
+[project.urls]
+Homepage = "https://neurono-ml.github.io/sciencekit-py/"
+Documentation = "https://neurono-ml.github.io/sciencekit-py/"
+Repository = "https://github.com/neurono-ml/sciencekit-py"
+Issues = "https://github.com/neurono-ml/sciencekit-py/issues"
+
+[tool.maturin]
+python-source = "python"
+module-name = "sciencekit._native"
+features = ["extension-module"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

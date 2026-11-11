@@ -1,0 +1,30 @@
+[book]
+title = "sciencekit for Python"
+description = "Python bindings for the sciencekit machine-learning library — PyO3 and zero-copy NumPy over the stable sciencekit_ffi C ABI."
+authors = ["sciencekit project"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+theme = "theme"
+default-theme = "coal"
+preferred-dark-theme = "coal"
+additional-css = ["theme/custom.css"]
+additional-js = ["theme/custom.js"]
+git-repository-url = "https://github.com/neurono-ml/sciencekit-py"
+edit-url-template = "https://github.com/neurono-ml/sciencekit-py/edit/docs/documentations/docs/src/{path}"
+site-url = "/sciencekit-py/"
+no-section-label = true
+
+[output.html.search]
+enable = true
+boost-title = 2
+
+[output.html.playground]
+editable = false
+line-numbers = true
+copyable = true

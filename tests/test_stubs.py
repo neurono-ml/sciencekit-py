@@ -1,11 +1,12 @@
-"""Type stub presence, AST syntax, and `__all__` parity checks."""
+"""Type stub presence, AST syntax, PEP 561 resolution, and `__all__` parity checks."""
 
 from __future__ import annotations
 
 import ast
+import importlib.util
 from pathlib import Path
-import shutil
 import subprocess
+import sys
 
 import sciencekit
 import sciencekit.linear_model
@@ -50,10 +51,23 @@ def test_type_stubs_exist_and_cover_public_exports() -> None:
         missing = set(runtime_mod.__all__) - defined_names
         assert not missing, f"{stub_name} is missing exports: {sorted(missing)}"
 
-    mypy_exe = shutil.which("mypy")
-    if mypy_exe is not None:
+    if importlib.util.find_spec("mypy") is not None:
+        snippet = (
+            "import numpy as np\n"
+            "import sciencekit\n"
+            "from sciencekit.linear_model import LinearRegression, LinearRegressionModel\n"
+            "from sciencekit.preprocessing import StandardScaler, StandardScalerModel\n"
+            "x = np.zeros((4, 2), dtype=np.float64)\n"
+            "y = np.zeros(4, dtype=np.float64)\n"
+            "m: LinearRegressionModel = LinearRegression().include_intercept(True).fit(x, y)\n"
+            "p: np.ndarray = m.predict(x)\n"
+            "s: float = m.score(x, y)\n"
+            "sc: StandardScalerModel = StandardScaler().with_mean(True).fit(x)\n"
+            "t: np.ndarray = sc.transform(x)\n"
+        )
         result = subprocess.run(
-            [mypy_exe, "--strict", str(pkg_dir / "__init__.pyi")],
+            [sys.executable, "-m", "mypy", "--strict", "-c", snippet],
+            cwd="/tmp",
             capture_output=True,
             text=True,
             check=False,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sciencekit import linear_model, preprocessing
+from sciencekit import datasets, linear_model, preprocessing
 from sciencekit._exceptions import (
     InternalError,
     InvalidArgumentError,
@@ -11,6 +11,8 @@ from sciencekit._exceptions import (
     NotFittedError,
     ScienceKitError,
     ShapeError,
+    UnknownColumnError,
+    UnsupportedColumnTypeError,
     UnsupportedError,
 )
 from sciencekit._native import (
@@ -36,6 +38,7 @@ from sciencekit._native import (
     load,
     status_name,
 )
+from sciencekit.datasets import ConversionReport, describe, supported_representations
 from sciencekit.linear_model import (
     LinearRegression,
     LinearRegressionBuilder,
@@ -57,6 +60,7 @@ __all__ = [
     "BACKEND_FAER",
     "BACKEND_MATRIX_MULTIPLY",
     "BACKEND_NDARRAY_LINALG",
+    "ConversionReport",
     "CsrDescriptor",
     "DenseDescriptor",
     "FEATURE_F32",
@@ -85,9 +89,13 @@ __all__ = [
     "StandardScaler",
     "StandardScalerBuilder",
     "StandardScalerModel",
+    "UnknownColumnError",
+    "UnsupportedColumnTypeError",
     "UnsupportedError",
     "__version__",
     "abi_version",
+    "datasets",
+    "describe",
     "features",
     "linear_model",
     "linear_regression",
@@ -96,4 +104,5 @@ __all__ = [
     "preprocessing",
     "standard_scaler",
     "status_name",
+    "supported_representations",
 ]

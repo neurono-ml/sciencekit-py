@@ -52,7 +52,7 @@ pub(crate) fn sk_py_extract_non_negative_indices(
     py: Python<'_>,
     array_obj: &Bound<'_, PyAny>,
     field_name: &str,
-) -> Result<(&'static str, Vec<usize>), SKPyError> {
+) -> Result<(&'static str, Vec<usize>, usize), SKPyError> {
     let untyped = array_obj.cast::<PyUntypedArray>().map_err(|_| {
         SKPyError::invalid_argument(format!("CSR {field_name} must be a 1D numpy.ndarray"))
     })?;
@@ -80,7 +80,7 @@ pub(crate) fn sk_py_extract_non_negative_indices(
             }
             converted.push(value as usize);
         }
-        Ok(("int32", converted))
+        Ok(("int32", converted, slice.as_ptr() as usize))
     } else if array_dtype.is_equiv_to(&dtype::<i64>(py)) {
         let typed = array_obj.cast::<PyArray1<i64>>().map_err(|_| {
             SKPyError::invalid_argument(format!("failed to read int64 CSR {field_name}"))
@@ -98,7 +98,7 @@ pub(crate) fn sk_py_extract_non_negative_indices(
             }
             converted.push(value as usize);
         }
-        Ok(("int64", converted))
+        Ok(("int64", converted, slice.as_ptr() as usize))
     } else {
         Err(SKPyError::invalid_argument(format!(
             "CSR {field_name} dtype must be int32 or int64, found {array_dtype}"

@@ -5,12 +5,17 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from sciencekit import linear_model as linear_model, preprocessing as preprocessing
+from sciencekit import datasets as datasets, linear_model as linear_model, preprocessing as preprocessing
 from sciencekit.linear_model import (
     LinearRegression as LinearRegression,
     LinearRegressionBuilder as LinearRegressionBuilder,
     LinearRegressionModel as LinearRegressionModel,
     linear_regression as linear_regression,
+)
+from sciencekit.datasets import (
+    ConversionReport as ConversionReport,
+    describe as describe,
+    supported_representations as supported_representations,
 )
 from sciencekit.preprocessing import (
     StandardScaler as StandardScaler,
@@ -49,6 +54,8 @@ class ScienceKitError(Exception):
 class InvalidHandleError(ScienceKitError, RuntimeError): ...
 class ShapeError(ScienceKitError, ValueError): ...
 class InvalidArgumentError(ScienceKitError, ValueError): ...
+class UnknownColumnError(InvalidArgumentError, KeyError): ...
+class UnsupportedColumnTypeError(InvalidArgumentError, TypeError): ...
 class UnsupportedError(ScienceKitError, NotImplementedError): ...
 class NotFittedError(ScienceKitError, RuntimeError): ...
 class IoError(ScienceKitError, OSError): ...

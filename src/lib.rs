@@ -7,12 +7,6 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(missing_docs)]
 
-mod array;
-mod engine;
-mod error;
-mod lifecycle;
-mod wrappers;
-
 use std::ffi::CStr;
 
 use pyo3::prelude::*;
@@ -24,6 +18,12 @@ use crate::wrappers::{
     load,
 };
 
+mod array;
+mod datasets;
+mod engine;
+mod error;
+mod lifecycle;
+mod wrappers;
 /// Return the native C ABI semantic version as `{"major", "minor", "patch"}`.
 #[pyfunction]
 fn abi_version(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
@@ -117,11 +117,17 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<SKPyLinearRegressionModel>()?;
     module.add_class::<SKPyStandardScaler>()?;
     module.add_class::<SKPyStandardScalerModel>()?;
+    module.add_class::<datasets::SKPyConversionReport>()?;
 
     module.add_function(wrap_pyfunction!(abi_version, module)?)?;
     module.add_function(wrap_pyfunction!(features, module)?)?;
     module.add_function(wrap_pyfunction!(status_name, module)?)?;
     module.add_function(wrap_pyfunction!(live_handles, module)?)?;
     module.add_function(wrap_pyfunction!(load, module)?)?;
+    module.add_function(wrap_pyfunction!(datasets::describe, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        datasets::supported_representations,
+        module
+    )?)?;
     Ok(())
 }

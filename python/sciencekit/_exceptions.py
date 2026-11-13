@@ -29,6 +29,14 @@ class InvalidArgumentError(ScienceKitError, ValueError):
     """Raised when an argument, dtype, rank, or path is malformed (`STATUS_INVALID_ARGUMENT = 3`)."""
 
 
+class UnknownColumnError(InvalidArgumentError, KeyError):
+    """Raised when a requested column is absent from the frame (`KeyError`)."""
+
+
+class UnsupportedColumnTypeError(InvalidArgumentError, TypeError):
+    """Raised when a column dtype cannot become a numeric feature (`TypeError`)."""
+
+
 class UnsupportedError(ScienceKitError, NotImplementedError):
     """Raised when an operation or layout is unsupported (`STATUS_UNSUPPORTED = 4`)."""
 

@@ -19,6 +19,8 @@ pub(crate) struct SKPyCsrDescriptor {
     columns: usize,
     nnz: usize,
     data_pointer: usize,
+    indices_pointer: usize,
+    indptr_pointer: usize,
     column_indices: Vec<usize>,
     row_pointers: Vec<usize>,
 }
@@ -44,7 +46,7 @@ impl SKPyCsrDescriptor {
     }
 
     #[getter]
-    fn dtype(&self) -> &'static str {
+    pub(crate) fn dtype(&self) -> &'static str {
         self.dtype_name
     }
 
@@ -59,13 +61,23 @@ impl SKPyCsrDescriptor {
     }
 
     #[getter]
-    fn nnz(&self) -> usize {
+    pub(crate) fn nnz(&self) -> usize {
         self.nnz
     }
 
     #[getter]
-    fn data_pointer(&self) -> usize {
+    pub(crate) fn data_pointer(&self) -> usize {
         self.data_pointer
+    }
+
+    #[getter]
+    pub(crate) fn indices_pointer(&self) -> usize {
+        self.indices_pointer
+    }
+
+    #[getter]
+    pub(crate) fn indptr_pointer(&self) -> usize {
+        self.indptr_pointer
     }
 
     fn to_dense(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -111,6 +123,36 @@ impl SKPyCsrDescriptor {
 }
 
 impl SKPyCsrDescriptor {
+    /// Owned `data` buffer object.
+    pub(crate) fn data_object(&self) -> &Py<PyAny> {
+        &self.data
+    }
+
+    /// Scalar precision name (`float32`/`float64`).
+    pub(crate) fn dtype_name(&self) -> &'static str {
+        self.dtype_name
+    }
+
+    /// Row count.
+    pub(crate) fn rows(&self) -> usize {
+        self.rows
+    }
+
+    /// Column count.
+    pub(crate) fn columns(&self) -> usize {
+        self.columns
+    }
+
+    /// Row pointer buffer values.
+    pub(crate) fn row_pointers(&self) -> &[usize] {
+        &self.row_pointers
+    }
+
+    /// Column index buffer values.
+    pub(crate) fn column_indices(&self) -> &[usize] {
+        &self.column_indices
+    }
+
     pub(crate) fn validate_csr_object(
         py: Python<'_>,
         matrix: &Bound<'_, PyAny>,
@@ -146,9 +188,10 @@ impl SKPyCsrDescriptor {
         }
         let (rows, columns) = (shape.0 as usize, shape.1 as usize);
         let (dtype_name, nnz, data_pointer) = sk_py_validate_csr_data(py, data)?;
-        let (ind_dtype, column_indices) =
+        let (ind_dtype, column_indices, indices_pointer) =
             sk_py_extract_non_negative_indices(py, indices, "indices")?;
-        let (ptr_dtype, row_pointers) = sk_py_extract_non_negative_indices(py, indptr, "indptr")?;
+        let (ptr_dtype, row_pointers, indptr_pointer) =
+            sk_py_extract_non_negative_indices(py, indptr, "indptr")?;
         if ind_dtype != ptr_dtype {
             return Err(SKPyError::invalid_argument(format!(
                 "CSR index dtype mismatch: indices is {ind_dtype} while indptr is {ptr_dtype}"
@@ -180,18 +223,10 @@ impl SKPyCsrDescriptor {
             columns,
             nnz,
             data_pointer,
+            indices_pointer,
+            indptr_pointer,
             column_indices,
             row_pointers,
         })
     }
-}
-
-pub(crate) fn sk_py_is_csr_like(object: &Bound<'_, PyAny>) -> bool {
-    if object.is_instance_of::<SKPyCsrDescriptor>() {
-        return true;
-    }
-    if let Ok(Ok(fmt)) = object.getattr("format").map(|f| f.extract::<String>()) {
-        return fmt == "csr";
-    }
-    object.hasattr("indptr").unwrap_or(false) && object.hasattr("indices").unwrap_or(false)
 }

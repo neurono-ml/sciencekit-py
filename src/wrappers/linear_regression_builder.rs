@@ -2,9 +2,11 @@
 
 use pyo3::prelude::*;
 
-use super::input_helpers::{sk_py_prepare_matrix, sk_py_prepare_vector};
+use super::dataset_arguments::{SKPyDatasetKeywords, sk_py_prepare_fit_inputs};
 use super::linear_regression_model::SKPyLinearRegressionModel;
 use crate::array::dtype::sk_py_parse_dtype;
+use crate::datasets::SKPyConversionMetadata;
+use crate::datasets::report::SKPyConversionReport;
 use crate::engine::{SKPyBuilderHandle, SKPyEstimatorFamily, sk_py_parse_backend_code};
 use crate::error::sk_py_to_py_err;
 
@@ -12,6 +14,7 @@ use crate::error::sk_py_to_py_err;
 #[pyclass(name = "LinearRegression", module = "sciencekit.linear_model")]
 pub(crate) struct SKPyLinearRegression {
     handle: SKPyBuilderHandle,
+    last_conversion: std::sync::Mutex<Option<SKPyConversionMetadata>>,
 }
 
 #[pymethods]
@@ -38,7 +41,10 @@ impl SKPyLinearRegression {
                 Ok(builder)
             })
             .map_err(|e| sk_py_to_py_err(py, e))?;
-        Ok(SKPyLinearRegression { handle })
+        Ok(SKPyLinearRegression {
+            handle,
+            last_conversion: std::sync::Mutex::new(None),
+        })
     }
 
     #[getter]
@@ -73,26 +79,73 @@ impl SKPyLinearRegression {
         Ok(slf)
     }
 
-    #[pyo3(signature = (features, targets, *, copy = false))]
+    /// Report from the most recent conversion performed by this builder.
+    #[getter]
+    fn last_conversion(&self) -> Option<SKPyConversionReport> {
+        self.last_conversion
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .map(SKPyConversionReport::from_metadata)
+    }
+
+    #[pyo3(signature = (
+        features,
+        targets = None,
+        *,
+        target = None,
+        columns = None,
+        copy = false,
+        cast = false,
+        on_missing = "reject",
+        fill_value = None
+    ))]
+    #[allow(clippy::too_many_arguments)]
     fn fit(
         &self,
         py: Python<'_>,
         features: &Bound<'_, PyAny>,
-        targets: &Bound<'_, PyAny>,
+        targets: Option<&Bound<'_, PyAny>>,
+        target: Option<String>,
+        columns: Option<Vec<String>>,
         copy: bool,
+        cast: bool,
+        on_missing: &str,
+        fill_value: Option<f64>,
     ) -> PyResult<SKPyLinearRegressionModel> {
-        let expected_dtype = self.handle.dtype();
-        let borrowed_features = sk_py_prepare_matrix(py, features, expected_dtype, copy)
-            .map_err(|e| sk_py_to_py_err(py, e))?;
-        let borrowed_targets = sk_py_prepare_vector(py, targets, expected_dtype, copy)
-            .map_err(|e| sk_py_to_py_err(py, e))?;
-        let raw_features = borrowed_features.as_raw_parts();
-        let raw_targets = borrowed_targets.as_raw_parts();
+        let keywords = SKPyDatasetKeywords {
+            copy,
+            cast,
+            on_missing,
+            fill_value,
+        };
+        let prepared = sk_py_prepare_fit_inputs(
+            py,
+            features,
+            targets,
+            target,
+            &keywords,
+            columns,
+            self.handle.dtype(),
+            false,
+        )
+        .map_err(|e| sk_py_to_py_err(py, e))?;
+        let raw_features = prepared.features.raw_parts();
+        let raw_targets = prepared.targets.as_ref().map(|targets| targets.raw_parts());
+        let labels = prepared.labels.clone();
+        let metadata = prepared.metadata.clone();
         let model_handle = py
-            .detach(|| self.handle.fit(&raw_features, Some(&raw_targets)))
+            .detach(|| self.handle.fit(&raw_features, raw_targets.as_ref()))
             .map_err(|e| sk_py_to_py_err(py, e))?;
-        drop((borrowed_features, borrowed_targets));
-        Ok(SKPyLinearRegressionModel::from_handle(model_handle))
+        drop(prepared);
+        if let Ok(mut guard) = self.last_conversion.lock() {
+            *guard = Some(metadata.clone());
+        }
+        Ok(SKPyLinearRegressionModel::from_parts(
+            model_handle,
+            Some(metadata),
+            labels,
+        ))
     }
 
     fn close(&self, py: Python<'_>) {

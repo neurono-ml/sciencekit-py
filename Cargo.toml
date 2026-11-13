@@ -22,6 +22,7 @@ extension-module = ["pyo3/extension-module"]
 sciencekit_ffi = { git = "https://github.com/neurono-ml/sciencekit", branch = "main" }
 pyo3 = "0.30"
 numpy = "0.30"
+arrow = { version = "58", default-features = true, features = ["ffi"] }
 
 [profile.dev.package."*"]
 opt-level = 2

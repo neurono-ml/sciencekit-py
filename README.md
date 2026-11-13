@@ -49,11 +49,25 @@ with StandardScaler(dtype="float64") as scaler:
 - **Estimator families (`sciencekit_ffi` ABI 1.0):**
   - `sciencekit.linear_model.LinearRegression` / `LinearRegressionModel` (`fit`, `predict`, `score`, `save`, `load`, `float64` and `float32`).
   - `sciencekit.preprocessing.StandardScaler` / `StandardScalerModel` (`fit`, `transform`, `fit_transform`, `float64` and `float32`).
-- **NumPy array & CSR descriptors:**
-  - C-contiguous `float64` and `float32` `numpy.ndarray` inputs are borrowed **zero-copy** for the duration of the native call (`DenseDescriptor`). Non-contiguous views raise `UnsupportedError` unless `copy=True` is passed explicitly.
-  - `CsrDescriptor` validates Compressed Sparse Row (`data`, `indices`, `indptr`, `shape`) buffers and SciPy-compatible CSR objects. Because `sciencekit_ffi` ABI 1.0 accepts dense `SKFfiArray` buffers only, sparse inputs are never silently densified — call `csr.to_dense()` explicitly.
-- **Structured exceptions:** Every failure raises a `ScienceKitError` subclass (`InvalidHandleError`, `ShapeError`, `InvalidArgumentError`, `UnsupportedError`, `NotFittedError`, `IoError`, `InternalError`) carrying `.status_code`, `.status_name`, and `.message`.
+- **Dataset interoperability (`sciencekit.datasets`):**
+  - `numpy.ndarray` (`float32`/`float64`) is borrowed **zero-copy** when C-contiguous; strided views raise `UnsupportedError` unless `copy=True`, and precision changes require `cast=True`.
+  - `pandas.DataFrame`/`Series` (Arrow PyCapsule protocol, `to_numpy` fallback for pandas < 2.2), `pyarrow.Table`/`RecordBatch`/`RecordBatchReader`, any `__arrow_c_stream__` producer, `polars.DataFrame`/`LazyFrame`, `dask.dataframe.DataFrame` and `pyspark.sql.DataFrame` (driver `toArrow()`) are accepted by `fit`, `predict`, `transform` and `score`.
+  - `scipy.sparse.csr_matrix` is consumed through its `data`/`indices`/`indptr` buffers without densifying in the conversion layer; `csc_matrix`/`coo_matrix` convert explicitly. The dense block required by `sciencekit_ffi` ABI 1.0 is materialized only at the call boundary and is reported as `abi_dense_required=True`.
+  - `builder.last_conversion` / `model.last_conversion` return a `ConversionReport` with the borrowed buffer pointers, copy/cast/densification flags, Arrow batch counts, Dask partition sizes and categorical label tables. `sciencekit.describe(dataset)` reports the same facts without fitting.
+  - Results are NumPy arrays by default; `output="pandas" | "arrow" | "polars" | "sparse" | "auto"` selects another representation, and Arrow results implement `__arrow_c_stream__`.
+- **Dense & sparse descriptors:** `DenseDescriptor` and `CsrDescriptor` remain available for explicit buffer validation; a manually validated `CsrDescriptor` still requires `.to_dense()` before it reaches the ABI.
+- **Structured exceptions:** Every failure raises a `ScienceKitError` subclass (`InvalidHandleError`, `ShapeError`, `InvalidArgumentError`, `UnknownColumnError`, `UnsupportedColumnTypeError`, `UnsupportedError`, `NotFittedError`, `IoError`, `InternalError`) carrying `.status_code`, `.status_name`, and `.message`. `UnknownColumnError` is a `KeyError`, `UnsupportedColumnTypeError` a `TypeError`, and shape failures a `ValueError`.
 - **Lifecycle & concurrency:** Compute calls detach the Python GIL via `py.detach`. Fitted models are immutable and safe across concurrent Python threads. Handles are released deterministically via idempotent `.close()`, `with` context managers, or garbage-collector finalization.
+
+## Optional extras
+
+The dataset adapters import their library only when the corresponding object is
+passed, so none of them is a hard dependency:
+
+```bash
+pip install "sciencekit[datasets]"   # pandas, pyarrow, polars, scipy, dask
+pip install "sciencekit[spark]"      # pyspark 4
+```
 
 ## Building & Testing
 
@@ -61,6 +75,7 @@ with StandardScaler(dtype="float64") as scaler:
 maturin build --release --out dist
 pip install --force-reinstall dist/sciencekit-*.whl
 pytest -q
+mdbook build docs
 ```
 
 ## License

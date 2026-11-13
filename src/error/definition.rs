@@ -4,10 +4,22 @@ use std::fmt;
 
 use sciencekit_ffi::SKFfiStatus;
 
+/// Python exception family selected for one failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SKPyErrorKind {
+    /// Map the ABI status onto the `ScienceKitError` hierarchy.
+    Status,
+    /// Raise a `KeyError` subclass naming the offending column.
+    Key,
+    /// Raise a `TypeError` subclass naming the offending column and dtype.
+    Type,
+}
+
 /// A failure from descriptor validation or from a `sciencekit_ffi` call.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SKPyError {
     status: SKFfiStatus,
+    kind: SKPyErrorKind,
     message: String,
 }
 
@@ -16,8 +28,32 @@ impl SKPyError {
     pub(crate) fn new(status: SKFfiStatus, message: impl Into<String>) -> SKPyError {
         SKPyError {
             status,
+            kind: SKPyErrorKind::Status,
             message: message.into(),
         }
+    }
+
+    /// An unknown column or feature name (`KeyError` in Python).
+    pub(crate) fn key(message: impl Into<String>) -> SKPyError {
+        SKPyError {
+            status: SKFfiStatus::InvalidArgument,
+            kind: SKPyErrorKind::Key,
+            message: message.into(),
+        }
+    }
+
+    /// A column dtype that cannot become a numeric feature (`TypeError` in Python).
+    pub(crate) fn type_error(message: impl Into<String>) -> SKPyError {
+        SKPyError {
+            status: SKFfiStatus::InvalidArgument,
+            kind: SKPyErrorKind::Type,
+            message: message.into(),
+        }
+    }
+
+    /// Python exception family selected for this failure.
+    pub(crate) fn kind(&self) -> SKPyErrorKind {
+        self.kind
     }
 
     /// Construct an error from a non-OK `SKFfiStatus`, reading the thread-local
@@ -29,7 +65,11 @@ impl SKPyError {
         } else {
             recorded
         };
-        SKPyError { status, message }
+        SKPyError {
+            status,
+            kind: SKPyErrorKind::Status,
+            message,
+        }
     }
 
     /// Construct an error after a pointer-returning ABI entry point returned
@@ -42,7 +82,11 @@ impl SKPyError {
         } else {
             recorded
         };
-        SKPyError { status, message }
+        SKPyError {
+            status,
+            kind: SKPyErrorKind::Status,
+            message,
+        }
     }
 
     /// An operation attempted on a closed or unknown handle (`1`).

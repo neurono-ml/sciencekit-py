@@ -2,9 +2,11 @@
 
 use pyo3::prelude::*;
 
-use super::input_helpers::{sk_py_prepare_matrix, sk_py_prepare_vector};
+use super::dataset_arguments::{SKPyDatasetKeywords, sk_py_prepare_fit_inputs};
 use super::standard_scaler_model::SKPyStandardScalerModel;
 use crate::array::dtype::sk_py_parse_dtype;
+use crate::datasets::SKPyConversionMetadata;
+use crate::datasets::report::SKPyConversionReport;
 use crate::engine::{SKPyBuilderHandle, SKPyEstimatorFamily, sk_py_parse_backend_code};
 use crate::error::sk_py_to_py_err;
 
@@ -12,6 +14,7 @@ use crate::error::sk_py_to_py_err;
 #[pyclass(name = "StandardScaler", module = "sciencekit.preprocessing")]
 pub(crate) struct SKPyStandardScaler {
     handle: SKPyBuilderHandle,
+    last_conversion: std::sync::Mutex<Option<SKPyConversionMetadata>>,
 }
 
 #[pymethods]
@@ -40,7 +43,10 @@ impl SKPyStandardScaler {
                 Ok(builder)
             })
             .map_err(|e| sk_py_to_py_err(py, e))?;
-        Ok(SKPyStandardScaler { handle })
+        Ok(SKPyStandardScaler {
+            handle,
+            last_conversion: std::sync::Mutex::new(None),
+        })
     }
 
     #[getter]
@@ -83,42 +89,113 @@ impl SKPyStandardScaler {
         Ok(slf)
     }
 
-    #[pyo3(signature = (features, targets = None, *, copy = false))]
+    /// Report from the most recent conversion performed by this builder.
+    #[getter]
+    fn last_conversion(&self) -> Option<SKPyConversionReport> {
+        self.last_conversion
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .map(SKPyConversionReport::from_metadata)
+    }
+
+    #[pyo3(signature = (
+        features,
+        targets = None,
+        *,
+        target = None,
+        columns = None,
+        copy = false,
+        cast = false,
+        on_missing = "reject",
+        fill_value = None
+    ))]
+    #[allow(clippy::too_many_arguments)]
     fn fit(
         &self,
         py: Python<'_>,
         features: &Bound<'_, PyAny>,
         targets: Option<&Bound<'_, PyAny>>,
+        target: Option<String>,
+        columns: Option<Vec<String>>,
         copy: bool,
+        cast: bool,
+        on_missing: &str,
+        fill_value: Option<f64>,
     ) -> PyResult<SKPyStandardScalerModel> {
-        let expected_dtype = self.handle.dtype();
-        let borrowed_features = sk_py_prepare_matrix(py, features, expected_dtype, copy)
-            .map_err(|e| sk_py_to_py_err(py, e))?;
-        let borrowed_targets = match targets {
-            Some(target_obj) if !target_obj.is_none() => Some(
-                sk_py_prepare_vector(py, target_obj, expected_dtype, copy)
-                    .map_err(|e| sk_py_to_py_err(py, e))?,
-            ),
-            _ => None,
+        let keywords = SKPyDatasetKeywords {
+            copy,
+            cast,
+            on_missing,
+            fill_value,
         };
-        let raw_features = borrowed_features.as_raw_parts();
-        let raw_targets = borrowed_targets.as_ref().map(|b| b.as_raw_parts());
+        let prepared = sk_py_prepare_fit_inputs(
+            py,
+            features,
+            targets,
+            target,
+            &keywords,
+            columns,
+            self.handle.dtype(),
+            true,
+        )
+        .map_err(|e| sk_py_to_py_err(py, e))?;
+        let raw_features = prepared.features.raw_parts();
+        let raw_targets = prepared.targets.as_ref().map(|targets| targets.raw_parts());
+        let labels = prepared.labels.clone();
+        let metadata = prepared.metadata.clone();
         let model_handle = py
             .detach(|| self.handle.fit(&raw_features, raw_targets.as_ref()))
             .map_err(|e| sk_py_to_py_err(py, e))?;
-        drop((borrowed_features, borrowed_targets));
-        Ok(SKPyStandardScalerModel::from_handle(model_handle))
+        drop(prepared);
+        if let Ok(mut guard) = self.last_conversion.lock() {
+            *guard = Some(metadata.clone());
+        }
+        Ok(SKPyStandardScalerModel::from_parts(
+            model_handle,
+            Some(metadata),
+            labels,
+        ))
     }
 
-    #[pyo3(signature = (features, *, copy = false))]
+    #[pyo3(signature = (
+        features,
+        *,
+        target = None,
+        columns = None,
+        copy = false,
+        cast = false,
+        on_missing = "reject",
+        fill_value = None,
+        output = "numpy"
+    ))]
+    #[allow(clippy::too_many_arguments)]
     fn fit_transform(
         &self,
         py: Python<'_>,
         features: &Bound<'_, PyAny>,
+        target: Option<String>,
+        columns: Option<Vec<String>>,
         copy: bool,
+        cast: bool,
+        on_missing: &str,
+        fill_value: Option<f64>,
+        output: &str,
     ) -> PyResult<Py<PyAny>> {
-        let fitted = self.fit(py, features, None, copy)?;
-        let result = fitted.transform(py, features, copy);
+        let transform_columns = columns.clone();
+        let fitted = self.fit(
+            py, features, None, target, columns, copy, cast, on_missing, fill_value,
+        )?;
+        let result = fitted.transform(
+            py,
+            features,
+            transform_columns,
+            copy,
+            cast,
+            on_missing,
+            fill_value,
+            output,
+        );
         fitted.close(py);
         result
     }

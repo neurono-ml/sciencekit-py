@@ -88,16 +88,6 @@ impl<'py> SKPyBorrowedArray<'py> {
             )),
         }
     }
-
-    /// Extract plain-Rust `Send` descriptor parameters for `py.detach`.
-    pub(crate) fn as_raw_parts(&self) -> SKPyRawDescriptor {
-        SKPyRawDescriptor {
-            dtype: self.dtype as i32,
-            shape: self.shape.clone(),
-            data_pointer: self.data_pointer,
-            length: self.length,
-        }
-    }
 }
 
 /// Pure-Rust `Send` descriptor parameters safe to pass into `py.detach`.
@@ -110,6 +100,21 @@ pub(crate) struct SKPyRawDescriptor {
 }
 
 impl SKPyRawDescriptor {
+    /// Build descriptor parts for an owned or borrowed contiguous buffer.
+    pub(crate) fn from_parts(
+        dtype: SKFfiDataType,
+        shape: Vec<i64>,
+        data_pointer: usize,
+    ) -> SKPyRawDescriptor {
+        let length = shape.iter().product();
+        SKPyRawDescriptor {
+            dtype: dtype as i32,
+            shape,
+            data_pointer,
+            length,
+        }
+    }
+
     /// Materialize the C-layout `SKFfiArray` pointing into the borrowed buffer.
     pub(crate) fn to_ffi_array(&self) -> SKFfiArray {
         SKFfiArray {

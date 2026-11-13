@@ -6,6 +6,8 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+from sciencekit.datasets import ConversionReport
+
 class StandardScalerModel:
     @property
     def family(self) -> str: ...
@@ -13,24 +15,42 @@ class StandardScalerModel:
     def dtype(self) -> str: ...
     @property
     def closed(self) -> bool: ...
+    @property
+    def last_conversion(self) -> ConversionReport | None: ...
+    @property
+    def label_table(self) -> list[str] | None: ...
     def transform(
         self,
-        features: npt.NDArray[np.floating[Any]],
+        features: npt.NDArray[np.floating[Any]] | Any,
         *,
+        columns: list[str] | None = None,
         copy: bool = False,
-    ) -> npt.NDArray[np.floating[Any]]: ...
+        cast: bool = False,
+        on_missing: str = "reject",
+        fill_value: float | None = None,
+        output: str = "numpy",
+    ) -> Any: ...
     def predict(
         self,
-        features: npt.NDArray[np.floating[Any]],
+        features: npt.NDArray[np.floating[Any]] | Any,
         *,
+        columns: list[str] | None = None,
         copy: bool = False,
-    ) -> npt.NDArray[np.floating[Any]]: ...
+        cast: bool = False,
+        on_missing: str = "reject",
+        fill_value: float | None = None,
+        output: str = "numpy",
+    ) -> Any: ...
     def score(
         self,
-        features: npt.NDArray[np.floating[Any]],
-        targets: npt.NDArray[np.floating[Any]],
+        features: npt.NDArray[np.floating[Any]] | Any,
+        targets: npt.NDArray[np.floating[Any]] | Any,
         *,
+        columns: list[str] | None = None,
         copy: bool = False,
+        cast: bool = False,
+        on_missing: str = "reject",
+        fill_value: float | None = None,
     ) -> float: ...
     def save(self, path: str | os.PathLike[str]) -> None: ...
     def close(self) -> None: ...
@@ -59,20 +79,33 @@ class StandardScaler:
     def closed(self) -> bool: ...
     def with_mean(self, enabled: bool) -> StandardScaler: ...
     def with_std(self, enabled: bool) -> StandardScaler: ...
+    @property
+    def last_conversion(self) -> ConversionReport | None: ...
     def backend(self, backend: str) -> StandardScaler: ...
     def fit(
         self,
         features: npt.NDArray[np.floating[Any]] | Any,
-        targets: npt.NDArray[np.floating[Any]] | None = None,
+        targets: npt.NDArray[np.floating[Any]] | Any | None = None,
         *,
+        target: str | None = None,
+        columns: list[str] | None = None,
         copy: bool = False,
+        cast: bool = False,
+        on_missing: str = "reject",
+        fill_value: float | None = None,
     ) -> StandardScalerModel: ...
     def fit_transform(
         self,
-        features: npt.NDArray[np.floating[Any]],
+        features: npt.NDArray[np.floating[Any]] | Any,
         *,
+        target: str | None = None,
+        columns: list[str] | None = None,
         copy: bool = False,
-    ) -> npt.NDArray[np.floating[Any]]: ...
+        cast: bool = False,
+        on_missing: str = "reject",
+        fill_value: float | None = None,
+        output: str = "numpy",
+    ) -> Any: ...
     def close(self) -> None: ...
     def __enter__(self) -> StandardScaler: ...
     def __exit__(
